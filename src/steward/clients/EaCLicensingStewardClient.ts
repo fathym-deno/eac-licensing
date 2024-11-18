@@ -1,5 +1,4 @@
-import { EaCBaseClient } from "jsr:@fathym/eac@0.2.17/steward/clients";
-import { EaCUserLicense } from "../../licensing/.exports.ts";
+import { EaCBaseClient, EaCUserLicense } from "./.deps.ts";
 
 export class EaCLicensingStewardClient extends EaCBaseClient {
   constructor(baseUrl: URL, apiToken: string) {

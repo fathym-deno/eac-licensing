@@ -1,22 +1,18 @@
-import { EverythingAsCode } from "jsr:@fathym/eac@0.2.17";
 import {
+  EaCAPIProcessor,
+  EaCApplicationAsCode,
   EaCDistributedFileSystemDetails,
   EaCJSRDistributedFileSystemDetails,
   EaCLocalDistributedFileSystemDetails,
-  IoCContainer,
-} from "./.deps.ts";
-import { EaCRuntimeConfig } from "jsr:@fathym/eac@0.2.17/runtime/config";
-import {
+  EaCProjectAsCode,
+  EaCRuntimeConfig,
   EaCRuntimePlugin,
   EaCRuntimePluginConfig,
-} from "jsr:@fathym/eac@0.2.17/runtime/plugins";
-import {
-  EaCApplicationAsCode,
-  EaCProjectAsCode,
+  EverythingAsCode,
   EverythingAsCodeApplications,
-} from "jsr:@fathym/eac-applications@0.0.20";
-import { EverythingAsCodeDenoKV } from "jsr:@fathym/eac-deno-kv@0.0.4";
-import { EaCAPIProcessor } from "jsr:@fathym/eac-applications@0.0.20/processors";
+  EverythingAsCodeDenoKV,
+  IoCContainer,
+} from "./.deps.ts";
 
 export type EaCLicensingStewardPluginOptions = {
   DFS?: {
