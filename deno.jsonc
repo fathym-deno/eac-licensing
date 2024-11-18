@@ -2,7 +2,10 @@
   "name": "@fathym/eac-licensing",
   "version": "0.0.0",
   "exports": {
-    ".": "./src/licensing/.exports.ts"
+    ".": "./src/licensing/.exports.ts",
+    "./steward/api": "./src/steward/api/.exports.ts",
+    "./steward/clients": "./src/steward/clients/.exports.ts",
+    "./steward/plugins": "./src/steward/plugins/.exports.ts"
   },
   "tasks": {
     "build": "deno task build:fmt && deno task build:lint && deno task publish:check && deno task test",
