@@ -9,7 +9,7 @@ import {
   loadMainSecretClient,
   STATUS_CODE,
   Stripe,
-} from "../../../../.deps.ts";
+} from "../../../.deps.ts";
 
 export default {
   async GET(req, ctx) {

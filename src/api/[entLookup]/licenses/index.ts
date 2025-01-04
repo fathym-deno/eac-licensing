@@ -2,7 +2,7 @@ import {
   EaCRuntimeHandlers,
   EaCStewardAPIState,
   EaCUserLicense,
-} from "../../../.deps.ts";
+} from "../../.deps.ts";
 
 export default {
   async GET(req, ctx) {

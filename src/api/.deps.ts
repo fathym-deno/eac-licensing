@@ -21,10 +21,6 @@ export type {
 export type {
   EaCActuatorCheckRequest,
   EaCActuatorCheckResponse,
-  EaCActuatorConnectionsResponse,
-  EaCActuatorErrorResponse,
-  EaCActuatorRequest,
-  EaCActuatorResponse,
 } from "jsr:@fathym/eac@0.2.28/steward/actuators";
 export { eacExists } from "jsr:@fathym/eac@0.2.28/steward/utils";
 export {
@@ -39,15 +35,13 @@ export {
 
 export {
   eacGetSecrets,
-  eacSetSecrets,
   loadMainSecretClient,
 } from "jsr:@fathym/eac-azure@0.0.12/utils";
 
 export { Stripe } from "npm:stripe@17.3.1";
 
 export type {
-  EaCLicenseAsCode,
   EaCLicenseStripeDetails,
   EaCUserLicense,
   EverythingAsCodeLicensing,
-} from "../../licensing/.exports.ts";
+} from "../licensing/.exports.ts";
