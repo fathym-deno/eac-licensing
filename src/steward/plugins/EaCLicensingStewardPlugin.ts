@@ -33,7 +33,7 @@ export default class EaCLicensingStewardPlugin implements EaCRuntimePlugin {
       stewardApiMetaPath,
       "core",
       "steward-licensing",
-      "fathym:eac-licensing/api",
+      "fathym:eac-licensing/steward",
       "/api/steward/licensing*",
       "@fathym/eac-licensing",
       this.options ?? {},
