@@ -7,36 +7,36 @@ export type {
   EaCMetadataBase,
   EaCUserRecord,
   EverythingAsCode,
-} from "jsr:@fathym/eac@0.2.84";
+} from "jsr:@fathym/eac@0.2.90";
 export type {
   EaCRuntimeHandler,
   EaCRuntimeHandlers,
   EaCRuntimeHandlerSet,
-} from "jsr:@fathym/eac@0.2.84/runtime/pipelines";
+} from "jsr:@fathym/eac@0.2.90/runtime/pipelines";
 export type {
   EaCCommitRequest,
   EaCCommitResponse,
   EaCDeleteRequest,
-} from "jsr:@fathym/eac@0.2.84/steward";
+} from "jsr:@fathym/eac@0.2.90/steward";
 export type {
   EaCActuatorCheckRequest,
   EaCActuatorCheckResponse,
-} from "jsr:@fathym/eac@0.2.84/steward/actuators";
-export { eacExists } from "jsr:@fathym/eac@0.2.84/steward/utils";
+} from "jsr:@fathym/eac@0.2.90/steward/actuators";
+export { eacExists } from "jsr:@fathym/eac@0.2.90/steward/utils";
 export {
   type EaCStatus,
   EaCStatusProcessingTypes,
-} from "jsr:@fathym/eac@0.2.84/steward/status";
+} from "jsr:@fathym/eac@0.2.90/steward/status";
 
 export {
   type EaCStewardAPIState,
   userEaCMiddleware,
-} from "jsr:@fathym/eac-applications@0.0.82/steward/api";
+} from "jsr:@fathym/eac-applications@0.0.84/steward/api";
 
 export {
   eacGetSecrets,
   loadMainSecretClient,
-} from "jsr:@fathym/eac-azure@0.0.39/utils";
+} from "jsr:@fathym/eac-azure@0.0.40/utils";
 
 export { Stripe } from "npm:stripe@17.6.0";
 
