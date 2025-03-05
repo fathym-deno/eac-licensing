@@ -11,7 +11,7 @@ import {
   EverythingAsCodeLicensing,
   loadMainSecretClient,
   Stripe,
-} from "./.deps.ts";
+} from "../.deps.ts";
 
 export default {
   async POST(req, ctx) {

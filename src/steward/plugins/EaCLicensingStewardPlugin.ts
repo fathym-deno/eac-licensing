@@ -22,9 +22,7 @@ export default class EaCLicensingStewardPlugin implements EaCRuntimePlugin {
   constructor(protected options?: EaCLicensingStewardPluginOptions) {}
 
   public Setup(_config: EaCRuntimeConfig): Promise<EaCRuntimePluginConfig> {
-    const stewardApiMetaPath = import.meta.resolve(
-      "../steward/api",
-    );
+    const stewardApiMetaPath = import.meta.resolve("../api/licensing");
 
     const pluginConfig: EaCRuntimePluginConfig<
       EverythingAsCode & EverythingAsCodeApplications & EverythingAsCodeDenoKV

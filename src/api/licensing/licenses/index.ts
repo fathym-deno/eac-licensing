@@ -10,7 +10,7 @@ export default {
 
     const url = new URL(req.url);
 
-    const username = url.searchParams.get("username")!;
+    const username = url.searchParams.get("username") || ctx.State.Username;
 
     const eacKv = await ctx.Runtime.IoC.Resolve<Deno.Kv>(Deno.Kv, "eac");
 

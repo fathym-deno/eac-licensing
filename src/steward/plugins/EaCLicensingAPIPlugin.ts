@@ -113,7 +113,7 @@ export default class EaCLicensingAPIPlugin implements EaCRuntimePlugin {
                 Type: "JSR",
                 Package: "@fathym/eac-azure",
                 Version: "",
-                FileRoot: "/src/api/",
+                FileRoot: "/src/api/licensing/",
                 DefaultFile: "index.ts",
                 Extensions: ["ts"],
                 WorkerPath: import.meta.resolve(
