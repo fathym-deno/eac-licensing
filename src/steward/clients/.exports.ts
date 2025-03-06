@@ -1,2 +1,2 @@
 export * from "./EaCLicensingClient.ts";
-export * from "./loadEaCLicensingStewardSvc.ts";
+export * from "./loadEaCLicensingSvc.ts";

@@ -1,20 +1,20 @@
 import { loadJwtConfig } from "./.deps.ts";
 import { EaCLicensingClient } from "./EaCLicensingClient.ts";
 
-export async function loadEaCLicensingStewardSvc(): Promise<
+export async function loadEaCLicensingSvc(): Promise<
   EaCLicensingClient
 >;
 
-export async function loadEaCLicensingStewardSvc(
+export async function loadEaCLicensingSvc(
   eacApiKey: string,
 ): Promise<EaCLicensingClient>;
 
-export async function loadEaCLicensingStewardSvc(
+export async function loadEaCLicensingSvc(
   entLookup: string,
   username: string,
 ): Promise<EaCLicensingClient>;
 
-export async function loadEaCLicensingStewardSvc(
+export async function loadEaCLicensingSvc(
   eacApiKeyEntLookup?: string,
   username?: string,
 ): Promise<EaCLicensingClient> {
