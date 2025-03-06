@@ -1,6 +1,6 @@
 import { EaCBaseClient, EaCUserLicense } from "./.deps.ts";
 
-export class EaCLicensingStewardClient extends EaCBaseClient {
+export class EaCLicensingClient extends EaCBaseClient {
   constructor(baseUrl: URL, apiToken: string) {
     super(baseUrl, apiToken);
   }

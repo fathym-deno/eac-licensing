@@ -1,23 +1,23 @@
 import { loadJwtConfig } from "./.deps.ts";
-import { EaCLicensingStewardClient } from "./EaCLicensingStewardClient.ts";
+import { EaCLicensingClient } from "./EaCLicensingClient.ts";
 
 export async function loadEaCLicensingStewardSvc(): Promise<
-  EaCLicensingStewardClient
+  EaCLicensingClient
 >;
 
 export async function loadEaCLicensingStewardSvc(
   eacApiKey: string,
-): Promise<EaCLicensingStewardClient>;
+): Promise<EaCLicensingClient>;
 
 export async function loadEaCLicensingStewardSvc(
   entLookup: string,
   username: string,
-): Promise<EaCLicensingStewardClient>;
+): Promise<EaCLicensingClient>;
 
 export async function loadEaCLicensingStewardSvc(
   eacApiKeyEntLookup?: string,
   username?: string,
-): Promise<EaCLicensingStewardClient> {
+): Promise<EaCLicensingClient> {
   if (!eacApiKeyEntLookup) {
     eacApiKeyEntLookup = Deno.env.get("EAC_API_KEY");
 
@@ -40,9 +40,9 @@ export async function loadEaCLicensingStewardSvc(
     );
   }
 
-  const eacBaseUrl = Deno.env.get("EaCLicensingStewardClient_URL")!;
+  const eacBaseUrl = Deno.env.get("EaCLicensingClient_URL")!;
 
-  return new EaCLicensingStewardClient(
+  return new EaCLicensingClient(
     new URL(eacBaseUrl),
     eacApiKeyEntLookup ?? "",
   );
