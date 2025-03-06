@@ -3,8 +3,8 @@
   "version": "0.0.0",
   "exports": {
     ".": "./src/licensing/.exports.ts",
+    "./clients": "./src/clients/.exports.ts",
     "./steward/api": "./src/steward/api/.exports.ts",
-    "./steward/clients": "./src/steward/clients/.exports.ts",
     "./steward/plugins": "./src/steward/plugins/.exports.ts"
   },
   "tasks": {
