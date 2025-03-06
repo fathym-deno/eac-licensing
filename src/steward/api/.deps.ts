@@ -35,13 +35,13 @@ export {
 export {
   type EaCStewardAPIState,
   userEaCMiddleware,
-} from "jsr:@fathym/eac-applications@0.0.102/steward/api";
+} from "jsr:@fathym/eac-applications@0.0.104/steward/api";
 
 export {
   eacGetSecrets,
   eacSetSecrets,
   loadMainSecretClient,
-} from "jsr:@fathym/eac-azure@0.0.49/utils";
+} from "jsr:@fathym/eac-azure@0.0.50/utils";
 
 export { Stripe } from "npm:stripe@17.6.0";
 

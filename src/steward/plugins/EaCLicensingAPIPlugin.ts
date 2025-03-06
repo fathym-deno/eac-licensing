@@ -44,7 +44,7 @@ export default class EaCLicensingAPIPlugin implements EaCRuntimePlugin {
   constructor(protected options?: EaCLicensingAPIPluginOptions) {}
 
   public Setup(_config: EaCRuntimeConfig): Promise<EaCRuntimePluginConfig> {
-    const stewardApiMetaPath = import.meta.resolve("../../api");
+    const stewardApiMetaPath = import.meta.resolve("../../api/licensing");
 
     const fileScheme = "file:///";
 
