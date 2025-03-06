@@ -35,6 +35,7 @@ export default class EaCLicensingStewardPlugin implements EaCRuntimePlugin {
       "/api/steward/licensing*",
       "@fathym/eac-licensing",
       this.options ?? {},
+      "/src/steward/api/licensing/",
     );
 
     return Promise.resolve(pluginConfig);
