@@ -111,7 +111,7 @@ export default class EaCLicensingAPIPlugin implements EaCRuntimePlugin {
               } as EaCLocalDistributedFileSystemDetails)
               : ({
                 Type: "JSR",
-                Package: "@fathym/eac-azure",
+                Package: "@fathym/eac-licensing",
                 Version: "",
                 FileRoot: "/src/api/licensing/",
                 DefaultFile: "index.ts",
