@@ -1,4 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
+import { getStripeCustomer } from "../../../../utils/.export.ts";
 import {
   eacGetSecrets,
   EaCLicenseStripeDetails,
@@ -60,12 +61,7 @@ export default {
 
         const stripe = (Stripe as any)(stripeDetails.SecretKey)!;
 
-        const customers = await stripe.customers.search({
-          query: `email:"${username}"`,
-          limit: 1,
-        });
-
-        let customer = customers.data[0];
+        let customer = await getStripeCustomer(stripe, username);
 
         if (customer) {
           const subs = await stripe.subscriptions.search({
@@ -151,12 +147,7 @@ export default {
       const stripe: Stripe = (Stripe as any)(stripeDetails.SecretKey)!;
 
       try {
-        const customers = await stripe.customers.search({
-          query: `email:"${username}"`,
-          limit: 1,
-        });
-
-        let customer = customers.data[0];
+        let customer = await getStripeCustomer(stripe, username);
 
         if (!customer) {
           customer = await stripe.customers.create({
@@ -322,16 +313,11 @@ export default {
         const stripe = (Stripe as any)(stripeDetails.SecretKey)!;
 
         try {
-          const customers = await stripe.customers.search({
-            query: `email:"${username}"`,
-            limit: 1,
-          });
-
-          let customer = customers.data[0];
+          let customer = await getStripeCustomer(stripe, username);
 
           const subs = await stripe.subscriptions.search({
             query: [
-              `metadata["customer"]:"${customer.id}"`,
+              `metadata["customer"]:"${customer!.id}"`,
               `metadata["license"]:"${licLookup}"`,
             ].join(" AND "),
             limit: 1,
