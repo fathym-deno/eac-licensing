@@ -14,7 +14,7 @@ export class EaCLicensingStewardClient extends EaCBaseClient {
       //: Promise<T> {
       const response = await fetch(
         this.loadClientUrl(
-          `${entLookup}/licenses/${licLookup}?username=${username}`,
+          `licenses/${licLookup}?username=${username}`,
         ),
         {
           method: "DELETE",
@@ -33,7 +33,7 @@ export class EaCLicensingStewardClient extends EaCBaseClient {
       //: Promise<T> {
       const response = await fetch(
         this.loadClientUrl(
-          `${entLookup}/licenses/${licLookup}?username=${username}`,
+          `licenses/${licLookup}?username=${username}`,
         ),
         {
           headers: this.loadHeaders(),
@@ -49,7 +49,7 @@ export class EaCLicensingStewardClient extends EaCBaseClient {
     ): Promise<Record<string, EaCUserLicense>> => {
       //: Promise<T> {
       const response = await fetch(
-        this.loadClientUrl(`${entLookup}/licenses?username=${username}`),
+        this.loadClientUrl(`licenses?username=${username}`),
         {
           headers: this.loadHeaders(),
         },
@@ -68,7 +68,7 @@ export class EaCLicensingStewardClient extends EaCBaseClient {
       //: Promise<T> {
       const response = await fetch(
         this.loadClientUrl(
-          `${entLookup}/licenses/${licLookup}?username=${username}`,
+          `licenses/${licLookup}?username=${username}`,
         ),
         {
           method: "POST",
