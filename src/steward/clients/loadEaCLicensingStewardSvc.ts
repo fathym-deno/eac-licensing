@@ -40,7 +40,7 @@ export async function loadEaCLicensingStewardSvc(
     );
   }
 
-  const eacBaseUrl = Deno.env.get("EAC_API_BASE_URL")!;
+  const eacBaseUrl = Deno.env.get("EaCLicensingStewardClient_URL")!;
 
   return new EaCLicensingStewardClient(
     new URL(eacBaseUrl),
