@@ -1,3 +1,3 @@
-import { EaCRuntimeHandlerSet, userEaCMiddleware } from "../.deps.ts";
+import { buildUserEaCMiddleware, EaCRuntimeHandlerSet } from "../.deps.ts";
 
-export default [userEaCMiddleware] as EaCRuntimeHandlerSet;
+export default [buildUserEaCMiddleware()] as EaCRuntimeHandlerSet;
