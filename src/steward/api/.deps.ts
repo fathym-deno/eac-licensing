@@ -33,8 +33,8 @@ export {
 } from "jsr:@fathym/eac@0.2.96/steward/status";
 
 export {
+  buildUserEaCMiddleware,
   type EaCStewardAPIState,
-  userEaCMiddleware,
 } from "jsr:@fathym/eac-applications@0.0.112/steward/api";
 
 export {
