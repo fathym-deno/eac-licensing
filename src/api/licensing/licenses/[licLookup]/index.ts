@@ -1,5 +1,4 @@
 // deno-lint-ignore-file no-explicit-any
-import { getStripeCustomer } from "../../../../utils/.export.ts";
 import {
   eacGetSecrets,
   EaCLicenseStripeDetails,
@@ -7,10 +6,12 @@ import {
   EaCStewardAPIState,
   EaCUserLicense,
   EverythingAsCodeLicensing,
+  loadEaCStewardSvc,
   loadMainSecretClient,
   STATUS_CODE,
   Stripe,
 } from "../../../.deps.ts";
+import { getStripeCustomer } from "../../../../utils/.export.ts";
 
 export default {
   async GET(req, ctx) {
@@ -35,13 +36,11 @@ export default {
     const userLicense = licenses.value?.[licLookup];
 
     if (userLicense) {
-      const eac = await eacKv.get<EverythingAsCodeLicensing>([
-        "EaC",
-        "Current",
-        entLookup,
-      ]);
+      const eacSvc = await loadEaCStewardSvc(entLookup, username);
 
-      const eacLicense = eac.value?.Licenses?.[licLookup];
+      const eac: EverythingAsCodeLicensing = await eacSvc.EaC.Get();
+
+      const eacLicense = eac?.Licenses?.[licLookup];
 
       if (eacLicense) {
         let stripeDetails = eacLicense.Details as EaCLicenseStripeDetails;
@@ -94,7 +93,8 @@ export default {
   async POST(req, ctx) {
     const logger = ctx.Runtime.Logs;
 
-    const entLookup = ctx.State.UserEaC!.EnterpriseLookup;
+    const entLookup = ctx.Runtime.EaC.EnterpriseLookup!;
+    // const entLookup = ctx.State.UserEaC!.EnterpriseLookup;
 
     const url = new URL(req.url);
 
@@ -120,13 +120,11 @@ export default {
       licenses = {};
     }
 
-    const eac = await eacKv.get<EverythingAsCodeLicensing>([
-      "EaC",
-      "Current",
-      entLookup,
-    ]);
+    const eacSvc = await loadEaCStewardSvc(entLookup, username);
 
-    const eacLicense = eac.value?.Licenses?.[licLookup];
+    const eac: EverythingAsCodeLicensing = await eacSvc.EaC.Get();
+
+    const eacLicense = eac?.Licenses?.[licLookup];
 
     if (eacLicense) {
       let stripeDetails = eacLicense.Details as EaCLicenseStripeDetails;
@@ -169,7 +167,7 @@ export default {
 
         let sub: (typeof subs.data)[0] | undefined = subs.data[0];
 
-        const eacPrice = eac.value!.Licenses![licLookup]!
+        const eacPrice = eac!.Licenses![licLookup]!
           .Plans![licReq.PlanLookup]!.Prices![
             licReq.PriceLookup
           ]!;
@@ -265,7 +263,7 @@ export default {
   },
 
   async DELETE(req, ctx) {
-    const entLookup = ctx.State.UserEaC!.EnterpriseLookup;
+    const entLookup = ctx.Runtime.EaC.EnterpriseLookup!;
 
     const url = new URL(req.url);
 
@@ -286,13 +284,11 @@ export default {
     ).value;
 
     if (licenses) {
-      const eac = await eacKv.get<EverythingAsCodeLicensing>([
-        "EaC",
-        "Current",
-        entLookup,
-      ]);
+      const eacSvc = await loadEaCStewardSvc(entLookup, username);
 
-      const eacLicense = eac.value?.Licenses?.[licLookup];
+      const eac: EverythingAsCodeLicensing = await eacSvc.EaC.Get();
+
+      const eacLicense = eac?.Licenses?.[licLookup];
 
       if (eacLicense) {
         let stripeDetails = eacLicense.Details as EaCLicenseStripeDetails;

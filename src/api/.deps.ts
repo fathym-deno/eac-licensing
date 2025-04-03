@@ -22,6 +22,7 @@ export type {
   EaCActuatorCheckRequest,
   EaCActuatorCheckResponse,
 } from "jsr:@fathym/eac@0.2.105/steward/actuators";
+export { loadEaCStewardSvc } from "jsr:@fathym/eac@0.2.105/steward/clients";
 export { eacExists } from "jsr:@fathym/eac@0.2.105/steward/utils";
 export {
   type EaCStatus,
