@@ -2,28 +2,27 @@ import {
   EaCRuntimeHandlers,
   EaCStewardAPIState,
   EaCUserLicense,
-} from '../../.deps.ts';
+} from "../../.deps.ts";
 
 import {
   getStripeCustomer,
   recoverUserLicensesFromStripe,
-} from '../../../utils/.export.ts';
+} from "../../../utils/.export.ts";
 
 export default {
   async GET(req, ctx) {
-    debugger;
     const entLookup = ctx.Runtime.EaC.EnterpriseLookup!;
     const url = new URL(req.url);
-    const username = url.searchParams.get('username') || ctx.State.Username!;
+    const username = url.searchParams.get("username") || ctx.State.Username!;
 
-    const eacKv = await ctx.Runtime.IoC.Resolve<Deno.Kv>(Deno.Kv, 'eac');
+    const eacKv = await ctx.Runtime.IoC.Resolve<Deno.Kv>(Deno.Kv, "eac");
 
     let licenses = (
       await eacKv.get<Record<string, EaCUserLicense>>([
-        'EaC',
-        'Current',
+        "EaC",
+        "Current",
         entLookup,
-        'Licenses',
+        "Licenses",
         username,
       ])
     ).value;
@@ -32,7 +31,7 @@ export default {
       licenses = await recoverUserLicensesFromStripe(
         entLookup,
         username,
-        eacKv
+        eacKv,
       );
     }
 

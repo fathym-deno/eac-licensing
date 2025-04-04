@@ -1,19 +1,19 @@
-import { loadStripe } from './loadStripe.ts';
+import { loadStripe } from "./loadStripe.ts";
 import {
   EaCLicenseStripeDetails,
   EaCUserLicense,
   EverythingAsCodeLicensing,
   loadEaCStewardSvc,
-} from './.deps.ts';
-import { getStripeCustomer } from './.export.ts';
+} from "./.deps.ts";
+import { getStripeCustomer } from "./.export.ts";
 
-const VALID_SUB_STATUSES = ['active', 'trialing'];
+const VALID_SUB_STATUSES = ["active", "trialing"];
 
 export async function recoverUserLicensesFromStripe(
   entLookup: string,
   username: string,
   eacKv: Deno.Kv,
-  licFilter?: string
+  licFilter?: string,
 ): Promise<Record<string, EaCUserLicense>> {
   const eacSvc = await loadEaCStewardSvc(entLookup, username);
   const eac: EverythingAsCodeLicensing = await eacSvc.EaC.Get();
@@ -25,7 +25,7 @@ export async function recoverUserLicensesFromStripe(
 
     const eacLicense = eac.Licenses[licLookup];
     const stripe = await loadStripe(
-      eacLicense.Details as EaCLicenseStripeDetails
+      eacLicense.Details as EaCLicenseStripeDetails,
     );
     const customer = await getStripeCustomer(stripe, username);
     if (!customer) continue;
@@ -36,15 +36,15 @@ export async function recoverUserLicensesFromStripe(
         `metadata["license"]:"${licLookup}"`,
         `-status:"incomplete_expired"`,
         `-status:"canceled"`,
-      ].join(' AND '),
+      ].join(" AND "),
       limit: 1,
     });
 
     const sub = subs?.data?.[0];
     if (!sub || !VALID_SUB_STATUSES.includes(sub.status)) continue;
 
-    const planLookup = sub.metadata?.plan || 'default';
-    const priceLookup = sub.metadata?.price || 'default';
+    const planLookup = sub.metadata?.plan || "default";
+    const priceLookup = sub.metadata?.price || "default";
 
     discoveredLicenses[licLookup] = {
       SubscriptionID: sub.id,
@@ -55,8 +55,8 @@ export async function recoverUserLicensesFromStripe(
 
   if (Object.keys(discoveredLicenses).length > 0) {
     await eacKv.set(
-      ['EaC', 'Current', entLookup, 'Licenses', username],
-      discoveredLicenses
+      ["EaC", "Current", entLookup, "Licenses", username],
+      discoveredLicenses,
     );
   }
 

@@ -1,8 +1,8 @@
-import { EaCLicenseStripeDetails } from '../licensing/EaCLicenseStripeDetails.ts';
-import { eacGetSecrets, loadMainSecretClient, Stripe } from './.deps.ts';
+import { EaCLicenseStripeDetails } from "../licensing/EaCLicenseStripeDetails.ts";
+import { eacGetSecrets, loadMainSecretClient, Stripe } from "./.deps.ts";
 
 export async function loadStripe(
-  stripeDetails: EaCLicenseStripeDetails
+  stripeDetails: EaCLicenseStripeDetails,
 ): Promise<Stripe> {
   const secretClient = await loadMainSecretClient();
 
@@ -17,6 +17,7 @@ export async function loadStripe(
     ...secreted,
   };
 
+  // deno-lint-ignore no-explicit-any
   const stripe = (Stripe as any)(stripeDetails.SecretKey)!;
 
   return stripe;

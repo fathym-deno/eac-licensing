@@ -7,32 +7,31 @@ import {
   loadEaCStewardSvc,
   STATUS_CODE,
   Stripe,
-} from '../../../.deps.ts';
+} from "../../../.deps.ts";
 import {
   getStripeCustomer,
   loadStripe,
   recoverUserLicensesFromStripe,
-} from '../../../../utils/.export.ts';
+} from "../../../../utils/.export.ts";
 
 export default {
   async GET(req, ctx) {
-    debugger;
     const entLookup = ctx.State.UserEaC!.EnterpriseLookup;
 
     const url = new URL(req.url);
 
-    const username = url.searchParams.get('username')!;
+    const username = url.searchParams.get("username")!;
 
     const licLookup = ctx.Params.licLookup as string;
 
-    const eacKv = await ctx.Runtime.IoC.Resolve<Deno.Kv>(Deno.Kv, 'eac');
+    const eacKv = await ctx.Runtime.IoC.Resolve<Deno.Kv>(Deno.Kv, "eac");
 
     let licenses = (
       await eacKv.get<Record<string, EaCUserLicense>>([
-        'EaC',
-        'Current',
+        "EaC",
+        "Current",
         entLookup,
-        'Licenses',
+        "Licenses",
         username,
       ])
     )?.value;
@@ -41,7 +40,7 @@ export default {
       licenses = await recoverUserLicensesFromStripe(
         entLookup,
         username,
-        eacKv
+        eacKv,
       );
     }
 
@@ -56,14 +55,14 @@ export default {
 
       if (eacLicense) {
         const stripe = await loadStripe(
-          eacLicense.Details as EaCLicenseStripeDetails
+          eacLicense.Details as EaCLicenseStripeDetails,
         )!;
 
         let customer = await getStripeCustomer(stripe, username);
 
         if (customer) {
           const subResp = await stripe.subscriptions.retrieve(
-            userLicense.SubscriptionID
+            userLicense.SubscriptionID,
           );
 
           let sub = subResp as Stripe.Subscription;
@@ -73,15 +72,15 @@ export default {
               query: [
                 `metadata["customer"]:"${customer.id}"`,
                 `metadata["license"]:"${licLookup}"`,
-              ].join(' AND '),
+              ].join(" AND "),
               limit: 1,
-              expand: ['data.latest_invoice.payment_intent'],
+              expand: ["data.latest_invoice.payment_intent"],
             });
 
             sub = subs?.data[0];
           }
 
-          const validStati = ['trialing', 'active'];
+          const validStati = ["trialing", "active"];
 
           const res = {
             Active: sub && validStati.some((vs) => vs === sub.status),
@@ -98,7 +97,6 @@ export default {
   },
 
   async POST(req, ctx) {
-    debugger;
     const logger = ctx.Runtime.Logs;
 
     const entLookup = ctx.Runtime.EaC.EnterpriseLookup!;
@@ -106,20 +104,20 @@ export default {
 
     const url = new URL(req.url);
 
-    const username = url.searchParams.get('username')!;
+    const username = url.searchParams.get("username")!;
 
     const licLookup = ctx.Params.licLookup as string;
 
     const licReq: EaCUserLicense = await req.json();
 
-    const eacKv = await ctx.Runtime.IoC.Resolve<Deno.Kv>(Deno.Kv, 'eac');
+    const eacKv = await ctx.Runtime.IoC.Resolve<Deno.Kv>(Deno.Kv, "eac");
 
     let licenses = (
       await eacKv.get<Record<string, EaCUserLicense>>([
-        'EaC',
-        'Current',
+        "EaC",
+        "Current",
         entLookup,
-        'Licenses',
+        "Licenses",
         username,
       ])
     ).value;
@@ -136,7 +134,7 @@ export default {
 
     if (eacLicense) {
       const stripe = await loadStripe(
-        eacLicense.Details as EaCLicenseStripeDetails
+        eacLicense.Details as EaCLicenseStripeDetails,
       )!;
 
       try {
@@ -170,7 +168,7 @@ export default {
               `metadata["license"]:"${licLookup}"`,
               `-status:"incomplete_expired"`,
               `-status:"canceled"`,
-            ].join(' AND '),
+            ].join(" AND "),
             limit: 1,
           });
 
@@ -179,8 +177,8 @@ export default {
           sub = subs?.data[0];
         }
 
-        const eacPrice =
-          eac!.Licenses![licLookup]!.Plans![licReq.PlanLookup]!.Prices![
+        const eacPrice = eac!.Licenses![licLookup]!.Plans![licReq.PlanLookup]!
+          .Prices![
             licReq.PriceLookup
           ]!;
 
@@ -196,7 +194,7 @@ export default {
         const priceId = prices.data[0].id;
 
         if (
-          sub?.status === 'incomplete' &&
+          sub?.status === "incomplete" &&
           priceId !== sub.items.data[0].price.id
         ) {
           await stripe.subscriptions.cancel(sub.id);
@@ -219,11 +217,11 @@ export default {
                 price: priceId,
               },
             ],
-            payment_behavior: 'default_incomplete',
+            payment_behavior: "default_incomplete",
             payment_settings: {
-              save_default_payment_method: 'on_subscription',
+              save_default_payment_method: "on_subscription",
             },
-            expand: ['latest_invoice.payment_intent'],
+            expand: ["latest_invoice.payment_intent"],
             metadata: {
               customer: customer.id,
               license: licLookup,
@@ -237,7 +235,7 @@ export default {
                 price: priceId,
               },
             ],
-            expand: ['latest_invoice.payment_intent'],
+            expand: ["latest_invoice.payment_intent"],
           });
         }
 
@@ -247,8 +245,8 @@ export default {
           licenses[licLookup] = licReq;
 
           await eacKv.set(
-            ['EaC', 'Current', entLookup, 'Licenses', username],
-            licenses
+            ["EaC", "Current", entLookup, "Licenses", username],
+            licenses,
           );
 
           return Response.json({
@@ -259,7 +257,7 @@ export default {
       } catch (error) {
         logger.Package.error(
           `There was an error configuring the license '${licLookup}'`,
-          error
+          error,
         );
 
         return Response.json(error, {
@@ -272,7 +270,7 @@ export default {
       {},
       {
         status: STATUS_CODE.BadRequest,
-      }
+      },
     );
   },
 
@@ -281,18 +279,18 @@ export default {
 
     const url = new URL(req.url);
 
-    const username = url.searchParams.get('username')!;
+    const username = url.searchParams.get("username")!;
 
     const licLookup = ctx.Params.licLookup as string;
 
-    const eacKv = await ctx.Runtime.IoC.Resolve<Deno.Kv>(Deno.Kv, 'eac');
+    const eacKv = await ctx.Runtime.IoC.Resolve<Deno.Kv>(Deno.Kv, "eac");
 
     let licenses = (
       await eacKv.get<Record<string, EaCUserLicense>>([
-        'EaC',
-        'Current',
+        "EaC",
+        "Current",
         entLookup,
-        'Licenses',
+        "Licenses",
         username,
       ])
     ).value;
@@ -308,14 +306,14 @@ export default {
 
       if (eacLicense) {
         const stripe = await loadStripe(
-          eacLicense.Details as EaCLicenseStripeDetails
+          eacLicense.Details as EaCLicenseStripeDetails,
         )!;
 
         try {
           let customer = await getStripeCustomer(stripe, username);
 
           let subResp = await stripe.subscriptions.retrieve(
-            userLicense.SubscriptionID
+            userLicense.SubscriptionID,
           );
 
           let sub = subResp as Stripe.Subscription;
@@ -325,7 +323,7 @@ export default {
               query: [
                 `metadata["customer"]:"${customer!.id}"`,
                 `metadata["license"]:"${licLookup}"`,
-              ].join(' AND '),
+              ].join(" AND "),
               limit: 1,
             });
 
@@ -340,8 +338,8 @@ export default {
             delete licenses[licLookup];
 
             await eacKv.set(
-              ['EaC', 'Current', entLookup, 'Licenses', username],
-              licenses
+              ["EaC", "Current", entLookup, "Licenses", username],
+              licenses,
             );
 
             return Response.json({});
@@ -358,7 +356,7 @@ export default {
       {},
       {
         status: STATUS_CODE.BadRequest,
-      }
+      },
     );
   },
 } as EaCRuntimeHandlers<EaCStewardAPIState>;
