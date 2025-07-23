@@ -75,7 +75,7 @@ export default {
           }
 
           const prices = await stripe.prices.list({
-            // product: productId,
+            product: productId,
           });
 
           const priceLookups = Object.keys(eacPlan.Prices || {});
@@ -94,7 +94,7 @@ export default {
 
             if (!price) {
               await stripe.prices.create({
-                lookup_key: unitAmount.toString(),
+                lookup_key: `${productId}|${unitAmount.toString()}`,
                 unit_amount: unitAmount,
                 currency: eacPrice.Details!.Currency,
                 recurring: {
@@ -129,7 +129,7 @@ export default {
 
           priceCalls.push(
             ...prices.data.map(async (price) => {
-              const priceLookup = priceMap[price.lookup_key!];
+              const priceLookup = priceMap[`${productId}|${price.lookup_key!}`];
 
               await stripe.prices.update(price.id, {
                 active: !!priceLookup,

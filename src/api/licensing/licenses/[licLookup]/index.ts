@@ -187,7 +187,8 @@ export default {
         const productId = `${licLookup}-${licReq.PlanLookup}`;
 
         const prices = await stripe.prices.search({
-          query: `lookup_key:"${priceKey}" AND product:"${productId}"`,
+          query:
+            `lookup_key:"${productId}|${priceKey}" AND product:"${productId}"`,
           limit: 1,
         });
 
