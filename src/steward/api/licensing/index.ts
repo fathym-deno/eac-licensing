@@ -75,7 +75,7 @@ export default {
           }
 
           const prices = await stripe.prices.list({
-            product: productId,
+            // product: productId,
           });
 
           const priceLookups = Object.keys(eacPlan.Prices || {});
