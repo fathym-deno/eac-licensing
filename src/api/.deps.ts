@@ -37,7 +37,7 @@ export {
 export {
   eacGetSecrets,
   loadMainSecretClient,
-} from "jsr:@fathym/eac-azure@0.0.90/utils";
+} from "jsr:@fathym/eac-azure@0.0.92/utils";
 
 export { Stripe } from "npm:stripe@17.6.0";
 

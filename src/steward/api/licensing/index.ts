@@ -75,7 +75,7 @@ export default {
           }
 
           const prices = await stripe.prices.list({
-            // product: productId,
+            product: productId,
           });
 
           const priceLookups = Object.keys(eacPlan.Prices || {});
@@ -174,7 +174,8 @@ export default {
         Model: license,
       } as EaCActuatorResponse);
     } catch (err) {
-      logger.Package.error("There was an error configuring the licenses", err);
+      logger.Package.error("There was an error configuring the licenses");
+      logger.Package.error(err);
 
       return Response.json({
         HasError: true,
