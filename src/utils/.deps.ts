@@ -1,9 +1,9 @@
-export { loadEaCStewardSvc } from "jsr:@fathym/eac@0.2.112/steward/clients";
+export { loadEaCStewardSvc } from "jsr:@fathym/eac@0.2.113/steward/clients";
 
 export {
   eacGetSecrets,
   loadMainSecretClient,
-} from "jsr:@fathym/eac-azure@0.0.80/utils";
+} from "jsr:@fathym/eac-azure@0.0.90/utils";
 
 export { Stripe } from "npm:stripe@17.6.0";
 
