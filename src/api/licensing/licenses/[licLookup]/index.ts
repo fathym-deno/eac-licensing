@@ -153,13 +153,6 @@ export default {
 
         if (userLicense) {
           sub = await stripe.subscriptions.retrieve(userLicense.SubscriptionID);
-
-          //  TODO(AI): Verify sub is paid and active?
-          const verified = false;
-
-          if (!verified) {
-            sub = undefined;
-          }
         }
 
         if (!sub) {
@@ -176,6 +169,15 @@ export default {
           // TODO(ttrichar): Handle all of the different statis to deterimine what happens next,,,
 
           sub = subs?.data[0];
+        }
+
+        if (sub) {
+          //  TODO(AI): Verify sub is paid and active?
+          const verified = !sub.canceled_at;
+
+          if (!verified) {
+            sub = undefined;
+          }
         }
 
         const eacPrice = eac!.Licenses![licLookup]!.Plans![licReq.PlanLookup]!
