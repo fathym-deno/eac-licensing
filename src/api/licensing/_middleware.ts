@@ -1,3 +1,4 @@
-import { buildUserEaCMiddleware, EaCRuntimeHandlerSet } from "../.deps.ts";
+import { esbuildResolutionToURL } from "jsr:@luca/esbuild-deno-loader@0.10.3";
+import { buildEaCAPIMiddleware, EaCRuntimeHandlerSet } from "../.deps.ts";
 
-export default [buildUserEaCMiddleware()] as EaCRuntimeHandlerSet;
+export default [buildEaCAPIMiddleware()] as EaCRuntimeHandlerSet;

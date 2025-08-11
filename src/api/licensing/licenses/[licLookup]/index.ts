@@ -13,6 +13,7 @@ import {
   loadStripe,
   recoverUserLicensesFromStripe,
 } from "../../../../utils/.export.ts";
+import { EaCState } from "jsr:@fathym/eac-applications@0.0.154/steward/api";
 
 export default {
   async GET(req, ctx) {
@@ -47,7 +48,7 @@ export default {
     const userLicense = licenses?.[licLookup];
 
     if (userLicense) {
-      const eacSvc = await loadEaCStewardSvc(entLookup, username);
+      const eacSvc = ctx.State.Steward!;
 
       const eac: EverythingAsCodeLicensing = await eacSvc.EaC.Get();
 
@@ -126,7 +127,7 @@ export default {
       licenses = {};
     }
 
-    const eacSvc = await loadEaCStewardSvc(entLookup, username);
+    const eacSvc = ctx.State.Steward!;
 
     const eac: EverythingAsCodeLicensing = await eacSvc.EaC.Get();
 
@@ -299,7 +300,7 @@ export default {
     if (licenses) {
       const userLicense = licenses?.[licLookup];
 
-      const eacSvc = await loadEaCStewardSvc(entLookup, username);
+      const eacSvc = ctx.State.Steward!;
 
       const eac: EverythingAsCodeLicensing = await eacSvc.EaC.Get();
 
@@ -360,4 +361,4 @@ export default {
       },
     );
   },
-} as EaCRuntimeHandlers<EaCStewardAPIState>;
+} as EaCRuntimeHandlers<EaCStewardAPIState & EaCState>;
