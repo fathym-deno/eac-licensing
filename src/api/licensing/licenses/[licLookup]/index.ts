@@ -17,7 +17,7 @@ import { EaCState } from "jsr:@fathym/eac-applications@0.0.154/steward/api";
 
 export default {
   async GET(req, ctx) {
-    const entLookup = ctx.State.UserEaC!.EnterpriseLookup;
+    const entLookup = ctx.State.EnterpriseLookup!;
 
     const url = new URL(req.url);
 
