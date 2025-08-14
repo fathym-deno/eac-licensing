@@ -13,7 +13,7 @@ import {
   loadStripe,
   recoverUserLicensesFromStripe,
 } from "../../../../utils/.export.ts";
-import { EaCState } from "jsr:@fathym/eac-applications@0.0.154/steward/api";
+import { EaCState } from "jsr:@fathym/eac-applications@0.0.159/steward/api";
 
 export default {
   async GET(req, ctx) {
