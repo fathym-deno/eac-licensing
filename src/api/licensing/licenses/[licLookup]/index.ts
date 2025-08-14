@@ -1,3 +1,4 @@
+// deno-lint-ignore-file no-explicit-any
 import {
   EaCLicenseStripeDetails,
   EaCRuntimeHandlers,
@@ -15,147 +16,272 @@ import {
 } from "../../../../utils/.export.ts";
 import { EaCState } from "jsr:@fathym/eac-applications@0.0.159/steward/api";
 
+// ---------- Logging helpers ----------
+function getReqId(req: Request) {
+  return req.headers.get("x-request-id") ?? crypto.randomUUID();
+}
+function startTimer() {
+  const t0 = performance.now();
+  return () => Math.round(performance.now() - t0);
+}
+function safeError(e: unknown) {
+  if (e instanceof Error) {
+    return { name: e.name, message: e.message, stack: e.stack };
+  }
+  try {
+    return { message: JSON.stringify(e) };
+  } catch {
+    return { message: String(e) };
+  }
+}
+function redactCustomer(c?: Stripe.Customer | Stripe.DeletedCustomer | null) {
+  if (!c || (typeof (c as any).deleted === "boolean" && (c as any).deleted)) {
+    return c;
+  }
+  const cust = c as Stripe.Customer;
+  return { id: cust.id, email: cust.email, created: cust.created };
+}
+function redactSub(s?: Stripe.Subscription | null) {
+  if (!s) return s;
+  return {
+    id: s.id,
+    status: s.status,
+    canceled_at: s.canceled_at,
+    itemsCount: s.items?.data?.length ?? 0,
+    priceId: s.items?.data?.[0]?.price?.id,
+    latest_invoice: typeof s.latest_invoice === "string" ? s.latest_invoice : {
+      id: s.latest_invoice?.id,
+      payment_intent: typeof s.latest_invoice?.payment_intent === "string"
+        ? s.latest_invoice?.payment_intent
+        : {
+          id: (s.latest_invoice?.payment_intent as any)?.id,
+          status: (s.latest_invoice?.payment_intent as any)?.status,
+        },
+    },
+    metadata: s.metadata
+      ? { license: s.metadata["license"], customer: s.metadata["customer"] }
+      : undefined,
+  };
+}
+// -------------------------------------
+
 export default {
   async GET(req, ctx) {
+    const log = ctx.Runtime.Logs.Package;
+    const reqId = getReqId(req);
+    const done = startTimer();
+
     const entLookup = ctx.State.EnterpriseLookup!;
-
     const url = new URL(req.url);
-
     const username = url.searchParams.get("username")!;
-
     const licLookup = ctx.Params.licLookup as string;
 
-    const eacKv = await ctx.Runtime.IoC.Resolve<Deno.Kv>(Deno.Kv, "eac");
+    log.info(
+      `[GET licenses] reqId=${reqId} ent=${entLookup} user=${username} lic=${licLookup}`,
+    );
 
-    let licenses = (
-      await eacKv.get<Record<string, EaCUserLicense>>([
-        "EaC",
-        "Current",
-        entLookup,
-        "Licenses",
-        username,
-      ])
-    )?.value;
+    try {
+      const eacKv = await ctx.Runtime.IoC.Resolve<Deno.Kv>(Deno.Kv, "eac");
 
-    if (!licenses || Object.keys(licenses).length === 0) {
-      licenses = await recoverUserLicensesFromStripe(
-        entLookup,
-        username,
-        eacKv,
-      );
-    }
+      let licenses = (
+        await eacKv.get<Record<string, EaCUserLicense>>([
+          "EaC",
+          "Current",
+          entLookup,
+          "Licenses",
+          username,
+        ])
+      )?.value;
 
-    const userLicense = licenses?.[licLookup];
+      if (!licenses || Object.keys(licenses).length === 0) {
+        log.debug(`[GET] reqId=${reqId} KV miss; attempting Stripe recovery`);
+        licenses = await recoverUserLicensesFromStripe(
+          entLookup,
+          username,
+          eacKv,
+        );
+        log.info(
+          `[GET] reqId=${reqId} Stripe license recovery ${
+            licenses ? "succeeded" : "returned empty"
+          }`,
+        );
+      } else {
+        log.debug(
+          `[GET] reqId=${reqId} KV hit; license keys: ${
+            Object.keys(licenses).join(",")
+          }`,
+        );
+      }
 
-    if (userLicense) {
+      const userLicense = licenses?.[licLookup];
+
+      if (!userLicense) {
+        log.warn(
+          `[GET] reqId=${reqId} no userLicense found for lic=${licLookup}`,
+        );
+        log.info(`[GET] reqId=${reqId} done in ${done()}ms`);
+        return Response.json({ Active: false });
+      }
+
       const eacSvc = ctx.State.Steward!;
+      const eac: EverythingAsCodeLicensing = await eacSvc.EaC.Get();
+      const eacLicense = eac?.Licenses?.[licLookup];
 
+      if (!eacLicense) {
+        log.warn(
+          `[GET] reqId=${reqId} eacLicense not found for lic=${licLookup}`,
+        );
+        log.info(`[GET] reqId=${reqId} done in ${done()}ms`);
+        return Response.json({ Active: false });
+      }
+
+      const stripe = await loadStripe(
+        eacLicense.Details as EaCLicenseStripeDetails,
+      )!;
+
+      let customer = await getStripeCustomer(stripe, username);
+      log.debug(
+        `[GET] reqId=${reqId} Stripe customer ${
+          JSON.stringify(redactCustomer(customer))
+        }`,
+      );
+
+      if (!customer) {
+        log.warn(
+          `[GET] reqId=${reqId} Stripe customer not found for user=${username}`,
+        );
+        log.info(`[GET] reqId=${reqId} done in ${done()}ms`);
+        return Response.json({ Active: false });
+      }
+
+      const subResp = await stripe.subscriptions.retrieve(
+        userLicense.SubscriptionID,
+      );
+      let sub = subResp as Stripe.Subscription;
+
+      if (!sub) {
+        log.debug(
+          `[GET] reqId=${reqId} subscription id lookup empty; searching by metadata (cust=${customer.id}, lic=${licLookup})`,
+        );
+        const subs = await stripe.subscriptions.search({
+          query: [
+            `metadata["customer"]:"${customer.id}"`,
+            `metadata["license"]:"${licLookup}"`,
+          ].join(" AND "),
+          limit: 1,
+          expand: ["data.latest_invoice.payment_intent"],
+        });
+        sub = subs?.data[0];
+      }
+
+      log.debug(
+        `[GET] reqId=${reqId} subscription ${JSON.stringify(redactSub(sub))}`,
+      );
+
+      const validStati = ["trialing", "active"];
+      const active = !!(sub && validStati.some((s) => s === sub.status));
+
+      log.info(
+        `[GET] reqId=${reqId} result active=${active} status=${
+          sub?.status ?? "n/a"
+        } in ${done()}ms`,
+      );
+
+      return Response.json({
+        Active: active,
+        License: userLicense,
+        Subscription: sub,
+      });
+    } catch (err) {
+      log.error(`[GET] reqId=${reqId} unhandled error`, safeError(err));
+      return Response.json({ Active: false, Error: safeError(err) }, {
+        status: STATUS_CODE.BadRequest,
+      });
+    }
+  },
+
+  async POST(req, ctx) {
+    const log = ctx.Runtime.Logs.Package;
+    const reqId = getReqId(req);
+    const done = startTimer();
+
+    const entLookup = ctx.Runtime.EaC.EnterpriseLookup!;
+    const url = new URL(req.url);
+    const username = url.searchParams.get("username")!;
+    const licLookup = ctx.Params.licLookup as string;
+
+    log.info(
+      `[POST licenses] reqId=${reqId} ent=${entLookup} user=${username} lic=${licLookup}`,
+    );
+
+    try {
+      const licReq: EaCUserLicense = await req.json();
+      log.debug(
+        `[POST] reqId=${reqId} licReq plan=${licReq.PlanLookup} price=${licReq.PriceLookup}`,
+      );
+
+      const eacKv = await ctx.Runtime.IoC.Resolve<Deno.Kv>(Deno.Kv, "eac");
+      let licenses = (
+        await eacKv.get<Record<string, EaCUserLicense>>([
+          "EaC",
+          "Current",
+          entLookup,
+          "Licenses",
+          username,
+        ])
+      ).value;
+
+      if (!licenses) {
+        log.debug(`[POST] reqId=${reqId} KV empty; initializing`);
+        licenses = {};
+      }
+
+      const eacSvc = ctx.State.Steward!;
       const eac: EverythingAsCodeLicensing = await eacSvc.EaC.Get();
 
       const eacLicense = eac?.Licenses?.[licLookup];
 
-      if (eacLicense) {
-        const stripe = await loadStripe(
-          eacLicense.Details as EaCLicenseStripeDetails,
-        )!;
-
-        let customer = await getStripeCustomer(stripe, username);
-
-        if (customer) {
-          const subResp = await stripe.subscriptions.retrieve(
-            userLicense.SubscriptionID,
-          );
-
-          let sub = subResp as Stripe.Subscription;
-
-          if (!sub) {
-            const subs = await stripe.subscriptions.search({
-              query: [
-                `metadata["customer"]:"${customer.id}"`,
-                `metadata["license"]:"${licLookup}"`,
-              ].join(" AND "),
-              limit: 1,
-              expand: ["data.latest_invoice.payment_intent"],
-            });
-
-            sub = subs?.data[0];
-          }
-
-          const validStati = ["trialing", "active"];
-
-          const res = {
-            Active: sub && validStati.some((vs) => vs === sub.status),
-            License: userLicense,
-            Subscription: sub,
-          };
-
-          return Response.json(res);
-        }
+      if (!eacLicense) {
+        log.warn(
+          `[POST] reqId=${reqId} eacLicense not found for lic=${licLookup}`,
+        );
+        return Response.json({}, { status: STATUS_CODE.BadRequest });
       }
-    }
 
-    return Response.json({ Active: false });
-  },
-
-  async POST(req, ctx) {
-    const logger = ctx.Runtime.Logs;
-
-    const entLookup = ctx.Runtime.EaC.EnterpriseLookup!;
-    // const entLookup = ctx.State.UserEaC!.EnterpriseLookup;
-
-    const url = new URL(req.url);
-
-    const username = url.searchParams.get("username")!;
-
-    const licLookup = ctx.Params.licLookup as string;
-
-    const licReq: EaCUserLicense = await req.json();
-
-    const eacKv = await ctx.Runtime.IoC.Resolve<Deno.Kv>(Deno.Kv, "eac");
-
-    let licenses = (
-      await eacKv.get<Record<string, EaCUserLicense>>([
-        "EaC",
-        "Current",
-        entLookup,
-        "Licenses",
-        username,
-      ])
-    ).value;
-
-    if (!licenses) {
-      licenses = {};
-    }
-
-    const eacSvc = ctx.State.Steward!;
-
-    const eac: EverythingAsCodeLicensing = await eacSvc.EaC.Get();
-
-    const eacLicense = eac?.Licenses?.[licLookup];
-
-    if (eacLicense) {
       const stripe = await loadStripe(
         eacLicense.Details as EaCLicenseStripeDetails,
       )!;
 
       try {
-        const userLicense = licenses?.[licLookup];
+        const existingUserLicense = licenses?.[licLookup];
 
         let customer = await getStripeCustomer(stripe, username);
-
         if (!customer) {
-          customer = await stripe.customers.create({
-            email: username,
-          });
+          log.info(
+            `[POST] reqId=${reqId} creating Stripe customer for user=${username}`,
+          );
+          customer = await stripe.customers.create({ email: username });
         }
+        log.debug(
+          `[POST] reqId=${reqId} Stripe customer ${
+            JSON.stringify(redactCustomer(customer))
+          }`,
+        );
 
         let sub: Stripe.Subscription | undefined;
-
-        if (userLicense) {
-          sub = await stripe.subscriptions.retrieve(userLicense.SubscriptionID);
+        if (existingUserLicense) {
+          log.debug(
+            `[POST] reqId=${reqId} retrieving subscription by id=${existingUserLicense.SubscriptionID}`,
+          );
+          sub = await stripe.subscriptions.retrieve(
+            existingUserLicense.SubscriptionID,
+          );
         }
 
         if (!sub) {
+          log.debug(
+            `[POST] reqId=${reqId} searching subscriptions by metadata (cust=${customer.id}, lic=${licLookup})`,
+          );
           const subs = await stripe.subscriptions.search({
             query: [
               `metadata["customer"]:"${customer.id}"`,
@@ -165,28 +291,21 @@ export default {
             ].join(" AND "),
             limit: 1,
           });
-
-          // TODO(ttrichar): Handle all of the different statis to deterimine what happens next,,,
-
           sub = subs?.data[0];
         }
 
         if (sub) {
-          //  TODO(AI): Verify sub is paid and active?
           const verified = !sub.canceled_at;
-
-          if (!verified) {
-            sub = undefined;
-          }
+          log.debug(
+            `[POST] reqId=${reqId} found sub ${sub.id}; verified=${verified} status=${sub.status}`,
+          );
+          if (!verified) sub = undefined;
         }
 
+        // Price lookup in EaC
         const eacPrice = eac!.Licenses![licLookup]!.Plans![licReq.PlanLookup]!
-          .Prices![
-            licReq.PriceLookup
-          ]!;
-
-        const priceKey = Math.round(eacPrice.Details!.Value * 100).toString(); // `${licLookup}-${licReq.PlanLookup}-${licReq.PriceLookup}`;
-
+          .Prices![licReq.PriceLookup]!;
+        const priceKey = Math.round(eacPrice.Details!.Value * 100).toString();
         const productId = `${licLookup}-${licReq.PlanLookup}`;
 
         const prices = await stripe.prices.search({
@@ -195,62 +314,70 @@ export default {
           limit: 1,
         });
 
-        const priceId = prices.data[0].id;
+        const priceId = prices.data[0]?.id;
+        if (!priceId) {
+          log.error(
+            `[POST] reqId=${reqId} price not found for productId=${productId} priceKey=${priceKey}`,
+          );
+          return Response.json(
+            { error: "Price not found" },
+            { status: STATUS_CODE.BadRequest },
+          );
+        }
+        log.debug(`[POST] reqId=${reqId} resolved priceId=${priceId}`);
 
         if (
-          sub?.status === "incomplete" &&
-          priceId !== sub.items.data[0].price.id
+          sub?.status === "incomplete" && priceId !== sub.items.data[0].price.id
         ) {
+          log.info(
+            `[POST] reqId=${reqId} canceling mismatched incomplete sub=${sub.id} currentPrice=${
+              sub.items.data[0].price.id
+            } -> desiredPrice=${priceId}`,
+          );
           await stripe.subscriptions.cancel(sub.id);
-
           sub = undefined;
-          // } else if (
-          //   sub.status === 'canceled' &&
-          //   priceId !== sub.items.data[0].price.id
-          // ) {
-          //   sub = await stripe.subscriptions.resume(sub.id, {});
-
-          //   sub = undefined;
         }
 
         if (!sub) {
+          log.info(
+            `[POST] reqId=${reqId} creating subscription for customer=${customer.id}`,
+          );
           sub = await stripe.subscriptions.create({
             customer: customer.id,
-            items: [
-              {
-                price: priceId,
-              },
-            ],
+            items: [{ price: priceId }],
             payment_behavior: "default_incomplete",
             payment_settings: {
               save_default_payment_method: "on_subscription",
             },
             expand: ["latest_invoice.payment_intent"],
-            metadata: {
-              customer: customer.id,
-              license: licLookup,
-            },
+            metadata: { customer: customer.id, license: licLookup },
           });
         } else {
+          log.info(
+            `[POST] reqId=${reqId} updating subscription items for sub=${sub.id}`,
+          );
           sub = await stripe.subscriptions.update(sub.id, {
-            items: [
-              {
-                id: sub.items.data[0].id,
-                price: priceId,
-              },
-            ],
+            items: [{ id: sub.items.data[0].id, price: priceId }],
             expand: ["latest_invoice.payment_intent"],
           });
         }
 
+        log.debug(
+          `[POST] reqId=${reqId} subscription result ${
+            JSON.stringify(redactSub(sub))
+          }`,
+        );
+
         if (sub) {
           licReq.SubscriptionID = sub.id;
-
           licenses[licLookup] = licReq;
 
           await eacKv.set(
             ["EaC", "Current", entLookup, "Licenses", username],
             licenses,
+          );
+          log.info(
+            `[POST] reqId=${reqId} KV updated for user=${username} lic=${licLookup} in ${done()}ms`,
           );
 
           return Response.json({
@@ -258,109 +385,153 @@ export default {
             Subscription: sub,
           });
         }
+
+        log.error(
+          `[POST] reqId=${reqId} sub creation/update yielded undefined`,
+        );
+        return Response.json(
+          { error: "Subscription creation failed" },
+          { status: STATUS_CODE.BadRequest },
+        );
       } catch (error) {
-        logger.Package.error(
-          `There was an error configuring the license '${licLookup}'`,
-          error,
+        log.error(
+          `[POST] reqId=${reqId} error configuring license '${licLookup}'`,
+          safeError(error),
         );
 
-        return Response.json(error, {
+        return Response.json(safeError(error), {
           status: STATUS_CODE.BadRequest,
         });
       }
+    } finally {
+      log.info(`[POST] reqId=${reqId} done in ${done()}ms`);
     }
-
-    return Response.json(
-      {},
-      {
-        status: STATUS_CODE.BadRequest,
-      },
-    );
   },
 
   async DELETE(req, ctx) {
+    const log = ctx.Runtime.Logs.Package;
+    const reqId = getReqId(req);
+    const done = startTimer();
+
     const entLookup = ctx.Runtime.EaC.EnterpriseLookup!;
-
     const url = new URL(req.url);
-
     const username = url.searchParams.get("username")!;
-
     const licLookup = ctx.Params.licLookup as string;
 
-    const eacKv = await ctx.Runtime.IoC.Resolve<Deno.Kv>(Deno.Kv, "eac");
+    log.info(
+      `[DELETE licenses] reqId=${reqId} ent=${entLookup} user=${username} lic=${licLookup}`,
+    );
 
-    let licenses = (
-      await eacKv.get<Record<string, EaCUserLicense>>([
-        "EaC",
-        "Current",
-        entLookup,
-        "Licenses",
-        username,
-      ])
-    ).value;
+    try {
+      const eacKv = await ctx.Runtime.IoC.Resolve<Deno.Kv>(Deno.Kv, "eac");
 
-    if (licenses) {
+      let licenses = (
+        await eacKv.get<Record<string, EaCUserLicense>>([
+          "EaC",
+          "Current",
+          entLookup,
+          "Licenses",
+          username,
+        ])
+      ).value;
+
+      if (!licenses) {
+        log.warn(`[DELETE] reqId=${reqId} no licenses for user=${username}`);
+        return Response.json({}, { status: STATUS_CODE.BadRequest });
+      }
+
       const userLicense = licenses?.[licLookup];
+      if (!userLicense) {
+        log.warn(`[DELETE] reqId=${reqId} no userLicense for lic=${licLookup}`);
+        return Response.json({}, { status: STATUS_CODE.BadRequest });
+      }
 
       const eacSvc = ctx.State.Steward!;
-
       const eac: EverythingAsCodeLicensing = await eacSvc.EaC.Get();
-
       const eacLicense = eac?.Licenses?.[licLookup];
 
-      if (eacLicense) {
-        const stripe = await loadStripe(
-          eacLicense.Details as EaCLicenseStripeDetails,
-        )!;
-
-        try {
-          let customer = await getStripeCustomer(stripe, username);
-
-          let subResp = await stripe.subscriptions.retrieve(
-            userLicense.SubscriptionID,
-          );
-
-          let sub = subResp as Stripe.Subscription;
-
-          if (!sub) {
-            const subs = await stripe.subscriptions.search({
-              query: [
-                `metadata["customer"]:"${customer!.id}"`,
-                `metadata["license"]:"${licLookup}"`,
-              ].join(" AND "),
-              limit: 1,
-            });
-
-            sub = subs?.data[0];
-          }
-
-          if (sub) {
-            sub = await stripe.subscriptions.cancel(sub.id, {});
-          }
-
-          if (sub) {
-            delete licenses[licLookup];
-
-            await eacKv.set(
-              ["EaC", "Current", entLookup, "Licenses", username],
-              licenses,
-            );
-
-            return Response.json({});
-          }
-        } catch (error) {
-          return Response.json(error, {
-            status: STATUS_CODE.BadRequest,
-          });
-        }
+      if (!eacLicense) {
+        log.warn(
+          `[DELETE] reqId=${reqId} eacLicense not found for lic=${licLookup}`,
+        );
+        return Response.json({}, { status: STATUS_CODE.BadRequest });
       }
-    }
 
-    return Response.json(
-      {},
-      {
-        status: STATUS_CODE.BadRequest,
-      },
-    );
+      const stripe = await loadStripe(
+        eacLicense.Details as EaCLicenseStripeDetails,
+      )!;
+
+      try {
+        let customer = await getStripeCustomer(stripe, username);
+        log.debug(
+          `[DELETE] reqId=${reqId} Stripe customer ${
+            JSON.stringify(redactCustomer(customer))
+          }`,
+        );
+
+        let subResp = await stripe.subscriptions.retrieve(
+          userLicense.SubscriptionID,
+        );
+        let sub = subResp as Stripe.Subscription;
+
+        if (!sub) {
+          log.debug(
+            `[DELETE] reqId=${reqId} subscription id lookup empty; searching by metadata`,
+          );
+          const subs = await stripe.subscriptions.search({
+            query: [
+              `metadata["customer"]:"${customer!.id}"`,
+              `metadata["license"]:"${licLookup}"`,
+            ].join(" AND "),
+            limit: 1,
+          });
+          sub = subs?.data[0];
+        }
+
+        log.debug(
+          `[DELETE] reqId=${reqId} subscription pre-cancel ${
+            JSON.stringify(redactSub(sub))
+          }`,
+        );
+
+        if (sub) {
+          sub = await stripe.subscriptions.cancel(sub.id, {});
+          log.info(
+            `[DELETE] reqId=${reqId} subscription canceled sub=${sub.id}`,
+          );
+        } else {
+          log.warn(
+            `[DELETE] reqId=${reqId} subscription not found; nothing to cancel`,
+          );
+        }
+
+        if (sub) {
+          delete licenses[licLookup];
+          await eacKv.set(
+            ["EaC", "Current", entLookup, "Licenses", username],
+            licenses,
+          );
+          log.info(
+            `[DELETE] reqId=${reqId} KV updated; removed lic=${licLookup} in ${done()}ms`,
+          );
+          return Response.json({});
+        }
+
+        log.warn(
+          `[DELETE] reqId=${reqId} sub undefined after cancel; KV unchanged`,
+        );
+        return Response.json({}, { status: STATUS_CODE.BadRequest });
+      } catch (error) {
+        log.error(`[DELETE] reqId=${reqId} stripe error`, safeError(error));
+        return Response.json(safeError(error), {
+          status: STATUS_CODE.BadRequest,
+        });
+      }
+    } catch (err) {
+      log.error(`[DELETE] reqId=${reqId} unhandled error`, safeError(err));
+      return Response.json(safeError(err), { status: STATUS_CODE.BadRequest });
+    } finally {
+      log.info(`[DELETE] reqId=${reqId} done in ${done()}ms`);
+    }
   },
 } as EaCRuntimeHandlers<EaCStewardAPIState & EaCState>;
