@@ -44,8 +44,8 @@ export default {
       const currentLicenses = eac.Licenses || {};
       const current = currentLicenses[licLookup] || {};
       const license = handlerRequest.Model as EaCLicenseAsCode;
-      const licDetails =
-        (license.Details || current.Details!) as EaCLicenseStripeDetails;
+      const licDetails = (license.Details ||
+        current.Details!) as EaCLicenseStripeDetails;
 
       if (licDetails) {
         log.debug(
@@ -126,24 +126,26 @@ export default {
             const found = prices.data.find((p) => p.unit_amount === unitAmount);
             if (!found) {
               priceCalls.push(
-                stripe.prices.create({
-                  lookup_key: `${productId}|${unitAmount.toString()}`,
-                  unit_amount: unitAmount,
-                  currency: eacPrice.Details!.Currency,
-                  recurring: { interval },
-                  metadata: {
-                    priceId: `${licLookup}-${planLookup}-${priceLookup}`,
-                  },
-                  product: productId,
-                  nickname: eacPrice.Details?.Name,
-                  active: true,
-                }).then(() => {
-                  createdPrices++;
-                  log.info(
-                    () =>
-                      `[lic-act][${reqId}] price created product=${productId} amount=${unitAmount}`,
-                  );
-                }),
+                stripe.prices
+                  .create({
+                    lookup_key: `${productId}|${unitAmount.toString()}`,
+                    unit_amount: unitAmount,
+                    currency: eacPrice.Details!.Currency,
+                    recurring: { interval },
+                    metadata: {
+                      priceId: `${licLookup}-${planLookup}-${priceLookup}`,
+                    },
+                    product: productId,
+                    nickname: eacPrice.Details?.Name,
+                    active: true,
+                  })
+                  .then(() => {
+                    createdPrices++;
+                    log.info(
+                      () =>
+                        `[lic-act][${reqId}] price created product=${productId} amount=${unitAmount}`,
+                    );
+                  }),
               );
             }
           }
@@ -163,8 +165,9 @@ export default {
             const shouldBeActive = allowedAmounts.has(price.unit_amount ?? -1);
             if (price.active !== shouldBeActive) {
               priceCalls.push(
-                stripe.prices.update(price.id, { active: shouldBeActive }).then(
-                  () => {
+                stripe.prices
+                  .update(price.id, { active: shouldBeActive })
+                  .then(() => {
                     if (!shouldBeActive) deactivatedPrices++;
                     log.debug(
                       () =>
@@ -172,8 +175,7 @@ export default {
                           shouldBeActive ? "activated" : "deactivated"
                         } id=${price.id} amount=${price.unit_amount}`,
                     );
-                  },
-                ),
+                  }),
               );
             }
           }
@@ -234,7 +236,8 @@ export default {
         Model: license,
       } as EaCActuatorResponse);
     } catch (err) {
-      log.error(`[lic-act][${reqId}] error configuring licenses`, {
+      log.error(`[lic-act][${reqId}] error configuring licenses`);
+      log.error({
         error: err instanceof Error
           ? { name: err.name, message: err.message, stack: err.stack }
           : { message: safeJson(err) },

@@ -108,7 +108,9 @@ export default {
       } else {
         log.debug(
           `[GET] reqId=${reqId} KV hit; license keys: ${
-            Object.keys(licenses).join(",")
+            Object.keys(
+              licenses,
+            ).join(",")
           }`,
         );
       }
@@ -142,7 +144,9 @@ export default {
       let customer = await getStripeCustomer(stripe, username);
       log.debug(
         `[GET] reqId=${reqId} Stripe customer ${
-          JSON.stringify(redactCustomer(customer))
+          JSON.stringify(
+            redactCustomer(customer),
+          )
         }`,
       );
 
@@ -193,10 +197,14 @@ export default {
         Subscription: sub,
       });
     } catch (err) {
-      log.error(`[GET] reqId=${reqId} unhandled error`, safeError(err));
-      return Response.json({ Active: false, Error: safeError(err) }, {
-        status: STATUS_CODE.BadRequest,
-      });
+      log.error(`[GET] reqId=${reqId} unhandled error`);
+      log.error(safeError(err));
+      return Response.json(
+        { Active: false, Error: safeError(err) },
+        {
+          status: STATUS_CODE.BadRequest,
+        },
+      );
     }
   },
 
@@ -264,7 +272,9 @@ export default {
         }
         log.debug(
           `[POST] reqId=${reqId} Stripe customer ${
-            JSON.stringify(redactCustomer(customer))
+            JSON.stringify(
+              redactCustomer(customer),
+            )
           }`,
         );
 
@@ -304,7 +314,9 @@ export default {
 
         // Price lookup in EaC
         const eacPrice = eac!.Licenses![licLookup]!.Plans![licReq.PlanLookup]!
-          .Prices![licReq.PriceLookup]!;
+          .Prices![
+            licReq.PriceLookup
+          ]!;
         const priceKey = Math.round(eacPrice.Details!.Value * 100).toString();
         const productId = `${licLookup}-${licReq.PlanLookup}`;
 
@@ -327,7 +339,8 @@ export default {
         log.debug(`[POST] reqId=${reqId} resolved priceId=${priceId}`);
 
         if (
-          sub?.status === "incomplete" && priceId !== sub.items.data[0].price.id
+          sub?.status === "incomplete" &&
+          priceId !== sub.items.data[0].price.id
         ) {
           log.info(
             `[POST] reqId=${reqId} canceling mismatched incomplete sub=${sub.id} currentPrice=${
@@ -364,7 +377,9 @@ export default {
 
         log.debug(
           `[POST] reqId=${reqId} subscription result ${
-            JSON.stringify(redactSub(sub))
+            JSON.stringify(
+              redactSub(sub),
+            )
           }`,
         );
 
@@ -396,8 +411,8 @@ export default {
       } catch (error) {
         log.error(
           `[POST] reqId=${reqId} error configuring license '${licLookup}'`,
-          safeError(error),
         );
+        log.error(safeError(error));
 
         return Response.json(safeError(error), {
           status: STATUS_CODE.BadRequest,
@@ -465,7 +480,9 @@ export default {
         let customer = await getStripeCustomer(stripe, username);
         log.debug(
           `[DELETE] reqId=${reqId} Stripe customer ${
-            JSON.stringify(redactCustomer(customer))
+            JSON.stringify(
+              redactCustomer(customer),
+            )
           }`,
         );
 
@@ -490,7 +507,9 @@ export default {
 
         log.debug(
           `[DELETE] reqId=${reqId} subscription pre-cancel ${
-            JSON.stringify(redactSub(sub))
+            JSON.stringify(
+              redactSub(sub),
+            )
           }`,
         );
 
@@ -522,13 +541,15 @@ export default {
         );
         return Response.json({}, { status: STATUS_CODE.BadRequest });
       } catch (error) {
-        log.error(`[DELETE] reqId=${reqId} stripe error`, safeError(error));
+        log.error(`[DELETE] reqId=${reqId} stripe error`);
+        log.error(safeError(error));
         return Response.json(safeError(error), {
           status: STATUS_CODE.BadRequest,
         });
       }
     } catch (err) {
-      log.error(`[DELETE] reqId=${reqId} unhandled error`, safeError(err));
+      log.error(`[DELETE] reqId=${reqId} unhandled error`);
+      log.error(safeError(err));
       return Response.json(safeError(err), { status: STATUS_CODE.BadRequest });
     } finally {
       log.info(`[DELETE] reqId=${reqId} done in ${done()}ms`);
