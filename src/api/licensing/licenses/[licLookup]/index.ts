@@ -2,6 +2,7 @@
 import {
   EaCLicenseStripeDetails,
   EaCRuntimeHandlers,
+  EaCState,
   EaCStewardAPIState,
   EaCUserLicense,
   EverythingAsCodeLicensing,
@@ -14,7 +15,6 @@ import {
   loadStripe,
   recoverUserLicensesFromStripe,
 } from "../../../../utils/.export.ts";
-import { EaCState } from "jsr:@fathym/eac-applications@0.0.159/steward/api";
 
 // ---------- Logging helpers ----------
 function getReqId(req: Request) {
@@ -158,10 +158,21 @@ export default {
         return Response.json({ Active: false });
       }
 
-      const subResp = await stripe.subscriptions.retrieve(
-        userLicense.SubscriptionID,
-      );
-      let sub = subResp as Stripe.Subscription;
+      let sub: Stripe.Subscription | undefined;
+
+      try {
+        sub = await stripe.subscriptions.retrieve(userLicense.SubscriptionID);
+      } catch (err) {
+        if ((err as any).code === "resource_missing") {
+          delete licenses[licLookup];
+          await eacKv.set(
+            ["EaC", "Current", entLookup, "Licenses", username],
+            licenses,
+          );
+        } else {
+          throw err;
+        }
+      }
 
       if (!sub) {
         log.debug(
@@ -171,11 +182,28 @@ export default {
           query: [
             `metadata["customer"]:"${customer.id}"`,
             `metadata["license"]:"${licLookup}"`,
+            `metadata["parentEntLookup"]:"${ctx.Runtime.EaC
+              .EnterpriseLookup!}"`,
           ].join(" AND "),
           limit: 1,
           expand: ["data.latest_invoice.payment_intent"],
         });
         sub = subs?.data[0];
+      }
+
+      if (sub) {
+        const verified = !sub.canceled_at &&
+          sub.metadata["customer"] === customer.id &&
+          sub.metadata["license"] === licLookup &&
+          sub.metadata["parentEntLookup"] === ctx.Runtime.EaC.EnterpriseLookup!;
+
+        log.debug(
+          `[POST] reqId=${reqId} found sub ${sub.id}; verified=${verified} status=${sub.status}`,
+        );
+
+        if (!verified) {
+          sub = undefined;
+        }
       }
 
       log.debug(
@@ -296,6 +324,8 @@ export default {
             query: [
               `metadata["customer"]:"${customer.id}"`,
               `metadata["license"]:"${licLookup}"`,
+              `metadata["parentEntLookup"]:"${ctx.Runtime.EaC
+                .EnterpriseLookup!}"`,
               `-status:"incomplete_expired"`,
               `-status:"canceled"`,
             ].join(" AND "),
@@ -305,11 +335,19 @@ export default {
         }
 
         if (sub) {
-          const verified = !sub.canceled_at;
+          const verified = !sub.canceled_at &&
+            sub.metadata["customer"] === customer.id &&
+            sub.metadata["license"] === licLookup &&
+            sub.metadata["parentEntLookup"] ===
+              ctx.Runtime.EaC.EnterpriseLookup!;
+
           log.debug(
             `[POST] reqId=${reqId} found sub ${sub.id}; verified=${verified} status=${sub.status}`,
           );
-          if (!verified) sub = undefined;
+
+          if (!verified) {
+            sub = undefined;
+          }
         }
 
         // Price lookup in EaC
@@ -351,10 +389,11 @@ export default {
           sub = undefined;
         }
 
-        if (!sub) {
+        const createSub = async () => {
           log.info(
             `[POST] reqId=${reqId} creating subscription for customer=${customer.id}`,
           );
+
           sub = await stripe.subscriptions.create({
             customer: customer.id,
             items: [{ price: priceId }],
@@ -363,16 +402,39 @@ export default {
               save_default_payment_method: "on_subscription",
             },
             expand: ["latest_invoice.payment_intent"],
-            metadata: { customer: customer.id, license: licLookup },
+            metadata: {
+              customer: customer.id,
+              license: licLookup,
+              parentEntLookup: ctx.Runtime.EaC.EnterpriseLookup!,
+            },
           });
+        };
+
+        if (!sub) {
+          await createSub();
         } else {
           log.info(
             `[POST] reqId=${reqId} updating subscription items for sub=${sub.id}`,
           );
-          sub = await stripe.subscriptions.update(sub.id, {
-            items: [{ id: sub.items.data[0].id, price: priceId }],
-            expand: ["latest_invoice.payment_intent"],
-          });
+          try {
+            sub = await stripe.subscriptions.update(sub.id, {
+              items: [{ id: sub.items.data[0].id, price: priceId }],
+              expand: ["latest_invoice.payment_intent"],
+            });
+          } catch (error) {
+            if (
+              error instanceof Error &&
+              error.message.includes("No such subscription:") &&
+              error.message.includes("a similar object exists in")
+            ) {
+              log.info(
+                `[POST] reqId=${reqId} subscription cleanup required from environment testing for sub=${sub.id}`,
+              );
+              await stripe.subscriptions.cancel(sub.id);
+
+              await createSub();
+            }
+          }
         }
 
         log.debug(
@@ -489,7 +551,7 @@ export default {
         let subResp = await stripe.subscriptions.retrieve(
           userLicense.SubscriptionID,
         );
-        let sub = subResp as Stripe.Subscription;
+        let sub = subResp as Stripe.Subscription | undefined;
 
         if (!sub) {
           log.debug(
@@ -499,10 +561,45 @@ export default {
             query: [
               `metadata["customer"]:"${customer!.id}"`,
               `metadata["license"]:"${licLookup}"`,
+              `metadata["parentEntLookup"]:"${ctx.Runtime.EaC
+                .EnterpriseLookup!}"`,
             ].join(" AND "),
             limit: 1,
           });
           sub = subs?.data[0];
+        }
+
+        if (sub) {
+          let customer = await getStripeCustomer(stripe, username);
+          log.debug(
+            `[GET] reqId=${reqId} Stripe customer ${
+              JSON.stringify(
+                redactCustomer(customer),
+              )
+            }`,
+          );
+
+          if (!customer) {
+            log.warn(
+              `[GET] reqId=${reqId} Stripe customer not found for user=${username}`,
+            );
+            log.info(`[GET] reqId=${reqId} done in ${done()}ms`);
+            return Response.json({ Active: false });
+          }
+
+          const verified = !sub.canceled_at &&
+            sub.metadata["customer"] === customer.id &&
+            sub.metadata["license"] === licLookup &&
+            sub.metadata["parentEntLookup"] ===
+              ctx.Runtime.EaC.EnterpriseLookup!;
+
+          log.debug(
+            `[POST] reqId=${reqId} found sub ${sub.id}; verified=${verified} status=${sub.status}`,
+          );
+
+          if (!verified) {
+            sub = undefined;
+          }
         }
 
         log.debug(
