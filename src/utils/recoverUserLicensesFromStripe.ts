@@ -45,11 +45,13 @@ export async function recoverUserLicensesFromStripe(
 
     const planLookup = sub.metadata?.plan || "default";
     const priceLookup = sub.metadata?.price || "default";
+    const couponLookup = sub.discount?.coupon?.id;
 
     discoveredLicenses[licLookup] = {
       SubscriptionID: sub.id,
       PlanLookup: planLookup,
       PriceLookup: priceLookup,
+      CouponLookup: couponLookup,
     };
   }
 
