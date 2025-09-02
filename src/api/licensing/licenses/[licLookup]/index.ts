@@ -435,7 +435,6 @@ export default {
             sub = await stripe.subscriptions.update(sub.id, {
               items: [{ id: sub.items.data[0].id, price: priceId }],
               coupon: couponId,
-              trial_period_days: trialPeriodDays,
               expand: ["latest_invoice.payment_intent"],
               metadata: {
                 ...(sub.metadata || {}),
