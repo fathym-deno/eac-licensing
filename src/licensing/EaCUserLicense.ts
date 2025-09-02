@@ -4,4 +4,6 @@ export type EaCUserLicense = {
   PriceLookup: string;
 
   SubscriptionID: string;
+
+  CouponLookup?: string;
 };

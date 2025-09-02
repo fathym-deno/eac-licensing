@@ -69,6 +69,8 @@ export default {
         let updatedProducts = 0;
         let createdPrices = 0;
         let deactivatedPrices = 0;
+        let createdCoupons = 0;
+        let createdPromotionCodes = 0;
 
         const productCalls = planLookups.map(async (planLookup) => {
           const productId = `${licLookup}-${planLookup}`;
@@ -185,6 +187,43 @@ export default {
 
         await Promise.all(productCalls);
 
+        const couponLookups = Object.keys(license.Coupons || {});
+        if (couponLookups.length > 0) {
+          const existingCoupons = await stripe.coupons.list();
+          const existingPromos = await stripe.promotionCodes.list();
+          const couponCalls = couponLookups.map(async (couponLookup) => {
+            const eacCoupon = license.Coupons![couponLookup];
+            const exists = existingCoupons.data.some((c) =>
+              c.id === couponLookup
+            );
+            if (!exists) {
+              await stripe.coupons.create({
+                id: couponLookup,
+                percent_off: eacCoupon.Details?.PercentOff,
+                amount_off: eacCoupon.Details?.AmountOff,
+                currency: eacCoupon.Details?.Currency,
+                duration: eacCoupon.Details?.Duration as any,
+                duration_in_months: eacCoupon.Details?.DurationInMonths,
+                name: eacCoupon.Details?.Name,
+              });
+              createdCoupons++;
+            }
+
+            const promoExists = existingPromos.data.some((p) =>
+              p.code === couponLookup
+            );
+            if (!promoExists) {
+              await stripe.promotionCodes.create({
+                coupon: couponLookup,
+                code: couponLookup,
+              });
+              createdPromotionCodes++;
+            }
+          });
+
+          await Promise.all(couponCalls);
+        }
+
         // Secrets handling
         const secretRoot = `licenses-${licLookup}`;
         const needsSecreting =
@@ -218,7 +257,7 @@ export default {
 
         log.info(
           () =>
-            `[lic-act][${reqId}] done license=${licLookup} products(created=${createdProducts}, updated=${updatedProducts}) prices(created=${createdPrices}, deactivated=${deactivatedPrices}) in ${done()}ms`,
+            `[lic-act][${reqId}] done license=${licLookup} products(created=${createdProducts}, updated=${updatedProducts}) prices(created=${createdPrices}, deactivated=${deactivatedPrices}) coupons(created=${createdCoupons}, promoCreated=${createdPromotionCodes}) in ${done()}ms`,
         );
       } else {
         log.warn(

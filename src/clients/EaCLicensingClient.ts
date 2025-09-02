@@ -64,6 +64,7 @@ export class EaCLicensingClient extends EaCBaseClient {
       licLookup: string,
       planLookup: string,
       priceLookup: string,
+      couponLookup?: string,
     ): Promise<unknown> => {
       //: Promise<T> {
       const response = await fetch(
@@ -76,6 +77,7 @@ export class EaCLicensingClient extends EaCBaseClient {
           body: JSON.stringify({
             PlanLookup: planLookup,
             PriceLookup: priceLookup,
+            CouponLookup: couponLookup,
           }),
         },
       );

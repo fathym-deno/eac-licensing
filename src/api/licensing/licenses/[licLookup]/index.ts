@@ -253,7 +253,7 @@ export default {
     try {
       const licReq: EaCUserLicense = await req.json();
       log.debug(
-        `[POST] reqId=${reqId} licReq plan=${licReq.PlanLookup} price=${licReq.PriceLookup}`,
+        `[POST] reqId=${reqId} licReq plan=${licReq.PlanLookup} price=${licReq.PriceLookup} coupon=${licReq.CouponLookup}`,
       );
 
       const eacKv = await ctx.Runtime.IoC.Resolve<Deno.Kv>(Deno.Kv, "eac");
@@ -351,12 +351,11 @@ export default {
         }
 
         // Price lookup in EaC
-        const eacPrice = eac!.Licenses![licLookup]!.Plans![licReq.PlanLookup]!
-          .Prices![
-            licReq.PriceLookup
-          ]!;
+        const eacPlan = eac!.Licenses![licLookup]!.Plans![licReq.PlanLookup]!;
+        const eacPrice = eacPlan.Prices![licReq.PriceLookup]!;
         const priceKey = Math.round(eacPrice.Details!.Value * 100).toString();
         const productId = `${licLookup}-${licReq.PlanLookup}`;
+        const trialPeriodDays = eacPlan.Details?.TrialPeriodDays;
 
         const prices = await stripe.prices.search({
           query:
@@ -375,6 +374,17 @@ export default {
           );
         }
         log.debug(`[POST] reqId=${reqId} resolved priceId=${priceId}`);
+
+        const couponId = licReq.CouponLookup;
+        if (couponId && !eacLicense.Coupons?.[couponId]) {
+          log.warn(
+            `[POST] reqId=${reqId} coupon not found for lic=${licLookup} coupon=${couponId}`,
+          );
+          return Response.json(
+            { error: "Coupon not found" },
+            { status: STATUS_CODE.BadRequest },
+          );
+        }
 
         if (
           sub?.status === "incomplete" &&
@@ -401,11 +411,16 @@ export default {
             payment_settings: {
               save_default_payment_method: "on_subscription",
             },
+            trial_period_days: trialPeriodDays,
+            coupon: couponId,
             expand: ["latest_invoice.payment_intent"],
             metadata: {
               customer: customer.id,
               license: licLookup,
               parentEntLookup: ctx.Runtime.EaC.EnterpriseLookup!,
+              plan: licReq.PlanLookup,
+              price: licReq.PriceLookup,
+              ...(couponId ? { coupon: couponId } : {}),
             },
           });
         };
@@ -419,7 +434,15 @@ export default {
           try {
             sub = await stripe.subscriptions.update(sub.id, {
               items: [{ id: sub.items.data[0].id, price: priceId }],
+              coupon: couponId,
+              trial_period_days: trialPeriodDays,
               expand: ["latest_invoice.payment_intent"],
+              metadata: {
+                ...(sub.metadata || {}),
+                plan: licReq.PlanLookup,
+                price: licReq.PriceLookup,
+                ...(couponId ? { coupon: couponId } : {}),
+              },
             });
           } catch (error) {
             if (

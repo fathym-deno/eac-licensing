@@ -6,4 +6,6 @@ export type EaCLicensePlanDetails = {
   Featured?: string;
 
   Priority: number;
+
+  TrialPeriodDays?: number;
 } & EaCVertexDetails;
