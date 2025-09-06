@@ -3,5 +3,7 @@ import { EaCLicensePlanDetails } from "./EaCLicensePlanDetails.ts";
 import { EaCLicensePriceAsCode } from "./EaCLicensePriceAsCode.ts";
 
 export type EaCLicensePlanAsCode = {
+  AccessConfigurationLookups?: string[];
+
   Prices: Record<string, EaCLicensePriceAsCode>;
 } & EaCDetails<EaCLicensePlanDetails>;
