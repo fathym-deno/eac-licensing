@@ -34,7 +34,7 @@ export {
   buildUserEaCMiddleware,
   type EaCState,
   type EaCStewardAPIState,
-} from "jsr:@fathym/eac-applications@0.0.176/steward/api";
+} from "jsr:@fathym/eac-applications@0.0.186/steward/api";
 
 export {
   eacGetSecrets,
