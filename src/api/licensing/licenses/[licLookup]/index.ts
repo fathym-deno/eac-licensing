@@ -160,19 +160,25 @@ export default {
 
       let sub: Stripe.Subscription | undefined;
 
-      try {
-        sub = await stripe.subscriptions.retrieve(userLicense.SubscriptionID);
-      } catch (err) {
-        if ((err as any).code === "resource_missing") {
-          delete licenses[licLookup];
-          await eacKv.set(
-            ["EaC", "Current", entLookup, "Licenses", username],
-            licenses,
-          );
-        } else {
-          throw err;
+      const retrieveSub = async (subId: string) => {
+        try {
+          return await stripe.subscriptions.retrieve(subId);
+        } catch (err) {
+          if ((err as any).code === "resource_missing") {
+            delete licenses[licLookup];
+            await eacKv.set(
+              ["EaC", "Current", entLookup, "Licenses", username],
+              licenses,
+            );
+          } else {
+            throw err;
+          }
         }
-      }
+
+        return undefined;
+      };
+
+      sub = await retrieveSub(userLicense.SubscriptionID);
 
       if (!sub) {
         log.debug(
@@ -288,6 +294,24 @@ export default {
         eacLicense.Details as EaCLicenseStripeDetails,
       )!;
 
+      const retrieveSub = async (subId: string) => {
+        try {
+          return await stripe.subscriptions.retrieve(subId);
+        } catch (err) {
+          if ((err as any).code === "resource_missing") {
+            delete licenses[licLookup];
+            await eacKv.set(
+              ["EaC", "Current", entLookup, "Licenses", username],
+              licenses,
+            );
+          } else {
+            throw err;
+          }
+        }
+
+        return undefined;
+      };
+
       try {
         const existingUserLicense = licenses?.[licLookup];
 
@@ -311,9 +335,7 @@ export default {
           log.debug(
             `[POST] reqId=${reqId} retrieving subscription by id=${existingUserLicense.SubscriptionID}`,
           );
-          sub = await stripe.subscriptions.retrieve(
-            existingUserLicense.SubscriptionID,
-          );
+          sub = await retrieveSub(existingUserLicense.SubscriptionID);
         }
 
         if (!sub) {
@@ -560,6 +582,24 @@ export default {
         eacLicense.Details as EaCLicenseStripeDetails,
       )!;
 
+      const retrieveSub = async (subId: string) => {
+        try {
+          return await stripe.subscriptions.retrieve(subId);
+        } catch (err) {
+          if ((err as any).code === "resource_missing") {
+            delete licenses[licLookup];
+            await eacKv.set(
+              ["EaC", "Current", entLookup, "Licenses", username],
+              licenses,
+            );
+          } else {
+            throw err;
+          }
+        }
+
+        return undefined;
+      };
+
       try {
         let customer = await getStripeCustomer(stripe, username);
         log.debug(
@@ -570,9 +610,7 @@ export default {
           }`,
         );
 
-        let subResp = await stripe.subscriptions.retrieve(
-          userLicense.SubscriptionID,
-        );
+        let subResp = await retrieveSub(userLicense.SubscriptionID);
         let sub = subResp as Stripe.Subscription | undefined;
 
         if (!sub) {
